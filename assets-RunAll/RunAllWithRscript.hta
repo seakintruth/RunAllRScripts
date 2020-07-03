@@ -1,0 +1,1090 @@
+<html>
+<head>
+<title>Run R Scripts</title>
+<HTA:APPLICATION
+     ID = "objAutoRefresh"
+     ApplicationName = "Run .R Scripts with Rscript.exe"
+     Icon = "iexpress.exe"
+     scroll = "auto"
+     maximizebutton = "no"
+     minimizebutton = "no"
+     navigable = "no"
+     Border = "dialog"
+     singleinstance = "yes"
+     WindowState = "maximize"
+>
+  <?
+  Other Icons
+    cliconfg.exe
+    MdRes.exe
+    Control.exe
+    NetProj.exe
+    Narrator.exe
+    OptionalFeatures.exe
+    PerfCenterCpl.ico
+    perfmon.exe
+    SystemPropertiesPerformance.exe
+    wextract.exe
+  ?>
+  <style type="text/css">
+    body { background-color:rgb(220,255,255); }
+    h1 { margin: 0px; font-family: Arial, Helvetica, sans-serif; font-size: 20px; font-weight: bold }
+    h2 { margin: 0px; padding: 0px 0px 0px 15px; font-family: Arial, Helvetica, sans-serif; font-size: 16px; font-weight: bold }
+    h3 { margin: 0px; padding: 0px 0px 0px 30px; font-family: Arial, Helvetica, sans-serif; font-size: 14px; font-weight: normal }
+    p { margin: 0px; padding: 0px 0px 0px 45px; font-family: Arial, Helvetica, sans-serif; font-size: 12px; font-weight: normal }
+    #ProgressBar{white-space:nowrap;letter-spacing:-1px;}
+    @media print
+      {#DisplayWebOnlyDoNotPrint{display:none;}}
+    @media screen
+      {#PrintOnlyDoNotDisplay{display:none;}}
+  </style>
+
+<SCRIPT LANGUAGE="VBScript">
+Option Explicit
+'Written by: Jeremy Dean Gerdes
+'Norfolk Naval Shipyard
+'C105 Health Physicist
+'jeremy.gerdes@navy.mil
+    'http://www.copyright.gov/title17/
+    'In accordance with 17 U.S.C. § 105 This work is 'noncopyright' or 'Public Domain'
+        'Subject matter of copyright: United States Government works
+        'Copyright protection under this title is not available for
+        'any work of the United States Government, but the United States
+        'Government is not precluded from receiving and holding copyrights
+        'transferred to it by assignment, bequest, or otherwise.
+        'as defined by 17 U.S.C § 101
+        '...
+        'A "work of the United States Government" is a work prepared by an
+        'officer or employee of the United States Government as part of that
+        'person's official duties.
+        '...
+
+'<div id=PrintOnlyDoNotDisplay>
+'<div id=DisplayWebOnlyDoNotPrint>
+
+Const strcAppName = "Run Rscript Cleanup"
+'Const gstrLogHeader = """UserName"",""MachineName"",""Date Time"",""Local Drive"",""Local Drive Free"","" Local Drive Available"",""Local Drive Percent Available"","" Local Drive FileSystem"",""CPU Max Clock Speed"",""Machine Asset Tag"",""Available RAM Gb"",""Total RAM Gb"",""Horizontal Screen Resolution"","" Vertical Screen Resolution"","" Dpi Width"","" Dpi Height"",""OS Bit"",""Office Version"""
+Const gstrLogHeader = """ProjectName"",""UserName"",""MachineName"",""Date Time"",""Local Drive"",""Local Drive Free"","" Local Drive Available"",""Local Drive Percent Available"","" Local Drive FileSystem"",""CPU Max Clock Speed"",""Machine Asset Tag"",""Available RAM Gb"",""Total RAM Gb"",""OS Bit"",""Office Version"""
+'For Placing MsgBox on top
+Const mdblcAllwaysOnTop = 262144
+
+'------------for Progress bar --------------
+Public w
+Public x
+Public y
+Public MyTitle
+Public fIncrementOnHtmlWrite
+
+w = 100
+x = 0
+y = 100
+MyTitle = " Progress"
+
+'For pauses in code to allow for document updates after document finishes loading
+Public idTimer
+'Initiate Actions, while allowing page to finalize
+idTimer = Window.setTimeout("ExecuteActions", 50, "VBScript")
+    '===========================================================
+    Sub ExecuteActions()
+    '===========================================================
+        'Clear Timer as we only need to ExecuteActions once
+        Window.clearTimeout (idTimer)
+
+        'Cleanup Local Variables
+        Const HKEY_CURRENT_USER = &H80000001
+        Const HKEY_LOCAL_MACHINE = &H80000002
+        Const strcConfigIniFileName = "RunAll.ini"
+        
+        'Windows Folder Namespaces:
+        'https://technet.microsoft.com/en-us/library/ee176604.aspx
+        Const ssfMyDocuments = &H5  ' My Documents: C:\Users\%username%\Documents
+        Const ssfStartup = &H7  ' Startup: C:\Users\%username%\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup
+        Const ssfUserProfile = &H28 'User Profile: C:\Users\%username%
+        Const ssfLocalAppdata = &H1C ' Local: C:\Users\%username%\AppData\Local  
+
+        'Define Object Variables        
+        Dim wshShell ' As IWshRuntimeLibrary.WshShell
+        Set wshShell = CreateObject("WScript.Shell") ' New IWshRuntimeLibrary.wshShell   
+        Dim wshExec ' As IWshRuntimeLibrary.WshExec
+        Dim wshShortcut ' As IWshRuntimeLibrary.WshShortcut
+        Dim objShell ' As Shell32.Shell
+        Dim Folder ' As fso.Folder
+        Dim fs ' As Scripting.FileSystemObject
+        Dim objNameSpace
+        Set fs = CreateObject("Scripting.FileSystemObject")
+        Set objShell = CreateObject("Shell.Application")
+
+        ' -------------------------------------------------------------------------
+        ' GetIniValues
+        ' -------------------------------------------------------------------------
+        Dim strConfigIniFilePath
+        strConfigIniFilePath = GetCurrentPath & "\" & strcConfigIniFileName
+        Dim strLogPath
+        strLogPath  = GetIniValue(strConfigIniFilePath, "Log", "LogLocation")
+        Dim strProjectName
+	strProjectName = GetIniValue(strConfigIniFilePath, "Config", "ProjectName")
+        Dim strRunScriptName
+        strRunScriptName = GetIniValue(strConfigIniFilePath, "Config", "RunScriptName")
+
+        ' -------------------------------------------------------------------------
+        ' Execute Scripts
+        ' -------------------------------------------------------------------------
+        WriteHtmlLine "<h1>Execute Scripts</h1>"
+        WriteHtmlLine "<h2>" & strProjectName & "</h2>"
+
+Dim strRscriptExe
+Dim intPathNumber
+intPathNumber = 1
+Do 
+    '"%userprofile%\Documents\R-3.5.1\bin\x64\Rscript.exe"   
+    strRscriptExe =  wshShell.ExpandEnvironmentStrings( _
+        GetIniValue( _
+            strConfigIniFilePath, _
+            "Config", _
+            "RscriptexePath" & intPathNumber _
+        ) _
+    )
+    intPathNumber = intPathNumber + 1
+Loop Until intPathNumber > 10 Or FileExists(strRscriptExe)
+WriteHtmlLine "Found Rscript.exe at " & strRscriptExe & "<br/>"
+
+Dim strFolder
+strFolder = ParentFolder(GetCurrentPath)
+WriteHtmlLine "Using script folder " & strFolder & "<br/>"
+Dim strCommand
+strCommand = """" & strRscriptExe & """ """ & strFolder & "\" & strRunScriptName & """"
+WriteHtmlLine "Running command: " & strcommand  & "<br/>"
+on error resume next
+wshShell.Run strCommand, 0, True
+if err.number <> 0 then
+    msgbox "Erorr:" & err.Number & vbcrlf & err.Description, ,  strProjectName
+end if
+        ' ------------------------------------------------------------------------- 
+        ' Logging use 
+        ' ------------------------------------------------------------------------- 
+        If FolderExists(ParentFolder(strLogPath)) Then
+            x = 85 
+            WriteHtmlLine "<h1>Logging Script Run</h1>" 
+            'Gather Machine Information (calling WriteToLog enters the UserName, Machine Name, and ...)
+            Dim strLogDetails
+            'WriteHtmlLine _
+            '    "<br/>" & "-------------Drives In Use-------------" & "<br/>" & _
+            'GetMachineDrives & GetMachineNetworkDrives(False)
+            'Add HDD Free Space and other machine information to a WipeLog on the Network
+            'We each item on a seperate line to ensure that we have the correct number of commas
+            strLogDetails = strProjectName
+            strLogDetails = strLogDetails & ",""" 
+            strLogDetails = strLogDetails & GetMachineLogicalDriveInformationForLog 'Local Drive,Local Drive Free, Local Drive Available ,Local Drive Percent Available, Local Drive FileSystem
+            strLogDetails = strLogDetails & ",""" 
+            strLogDetails = strLogDetails & GetMaxClockSpeed 'CPU Max Clock Speed
+            strLogDetails = strLogDetails & """,""" 
+            strLogDetails = strLogDetails & GetMachineAssetTag 'Machine Asset Tag
+            strLogDetails = strLogDetails & """," 
+            strLogDetails = strLogDetails & GetTotalAndAvailableRamForLog 'Available RAM Gb,Total RAM Gb
+            strLogDetails = strLogDetails & ",""" 
+            strLogDetails = strLogDetails & GetOSBitNumber 'OS Bit
+            strLogDetails = strLogDetails & """,""" 
+            strLogDetails = strLogDetails & GetOfficeVersion 'Office Version
+            strLogDetails = strLogDetails & """" 
+            WriteHtmlLine "Writing LogDetails to Log Path:" & strLogPath & "<br/>" & gstrLogHeader &  "<br/>" & strLogDetails 
+            WriteToLog strLogPath, strLogDetails             
+        End If
+
+        Dim strCompletionNotice
+        strCompletionNotice = strProjectName  & " Complete"
+        x = 94
+        WriteHtmlLine "<h2>" & strCompletionNotice & "</h2>"
+        'Close window in 5 seconds
+        Dim intSecondsRemaining
+        intSecondsRemaining = 5        
+        WriteHtmlLine "<br/> Closing window in "
+        Do 
+            WriteHtmlLine intSecondsRemaining & "..." 
+            WaitPingTimes 1
+            intSecondsRemaining = intSecondsRemaining - 1
+        Loop until intSecondsRemaining < 1
+        Window.Close
+    End Sub 
+
+    '===========================================================
+    'reading value in Registry
+    Function ReadingValueInReg(root, strKeyPath, strValueName, intValueType)
+	on error resume next
+        ' if an error occurs, then we just return null instead of reading, the calling code will handle that.
+        Dim strComputer: strComputer = "."
+        Dim oReg: Set oReg = GetObject("winmgmts:{impersonationLevel=impersonate}!\\" & strComputer & "\root\default:StdRegProv")
+        Dim isCreateOK: isCreateOK = oReg.CreateKey(root, strKeyPath)
+        Dim arrValues, rregResult, Value, i, strValue
+        If isCreateOK = 0 Then
+            Select Case intValueType
+                Case 1
+                    oReg.GetStringValue root, strKeyPath & "\", strValueName, arrValues
+                    rregResult = arrValues
+                Case 2
+                    oReg.GetDWORDValue root, strKeyPath & "\", strValueName, arrValues
+                    rregResult = arrValues
+                Case 3
+                    oReg.GetMultiStringValue root, strKeyPath & "\", strValueName, arrValues
+                    For Each Value In arrValues
+                        rregResult = rregResult & vbCrLf & Value
+                    Next
+                Case 4
+                    oReg.GetExpandedStringValue root, strKeyPath & "\", strValueName, arrValues
+                    rregResult = arrValues
+                Case 5
+                    oReg.GetBinaryValue root, strKeyPath & "\", strValueName, arrValues
+                    For i = LBound(strValue) To UBound(strValue)
+                        rregResult = rregResult & vbCrLf & strValue(i)
+                    Next
+                Case Else
+                rregResult = ""
+            End Select
+        End If
+        ReadingValueInReg = rregResult
+exitFunction:
+    End Function
+
+    '===========================================================
+    'Does this file exist?
+    Function FileExists(strPath)
+	on error resume next
+        Dim ObjFSO
+	Set objFSO = CreateObject("Scripting.FileSystemObject")
+	FileExists = objFSO.FileExists(strPath)
+    End Function
+
+    '===========================================================
+    'Does this folder exist?
+    Function FolderExists(strPath)
+	on error resume next
+        Dim ObjFSO
+	Set objFSO = CreateObject("Scripting.FileSystemObject")
+	FolderExists = objFSO.FolderExists(strPath)
+    End Function
+
+
+    '===========================================================
+    ' Get parent folder name
+    Function ParentFolder(strPath)
+	on error resume next
+        Dim ObjFSO
+	Set objFSO = CreateObject("Scripting.FileSystemObject")
+	ParentFolder = objFSO.GetParentFolderName(strPath)
+    End Function
+
+    '===========================================================
+    'get office version
+    Function GetOfficeVersion()
+        'Constants for Registry Key Roots
+        Const HKEY_CLASSES_ROOT = &H80000000
+        Const HKEY_CURRENT_USER = &H80000001
+        Const HKEY_LOCAL_MACHINE = &H80000002
+        Const HKEY_USERS = &H80000003
+        Const HKEY_CURRENT_CONFIG = &H80000005
+    
+        Dim officeVersion
+        Dim excelFilePath
+        Dim powerpntFilePath
+        Dim puplishFilePath
+        Dim outlookFilePath
+        
+        Dim subObjFSO: Set subObjFSO = CreateObject("Scripting.FileSystemObject")
+        'On Error Resume Next
+        Dim wordFilePath: wordFilePath = ReadingValueInReg(HKEY_LOCAL_MACHINE, "SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\Winword.exe", "", 1)
+        If Trim(wordFilePath) <> "" Then
+          If subObjFSO.FileExists(wordFilePath) Then
+             officeVersion = subObjFSO.GetFileVersion(wordFilePath)
+          End If
+        Else
+          excelFilePath = ReadingValueInReg(HKEY_LOCAL_MACHINE, "SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\excel.exe", "", 1)
+          If Trim(excelFilePath) <> "" Then
+             If subObjFSO.FileExists(excelFilePath) Then
+                officeVersion = subObjFSO.GetFileVersion(excelFilePath)
+             End If
+          Else
+             powerpntFilePath = ReadingValueInReg(HKEY_LOCAL_MACHINE, "SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\powerpnt.exe", "", 1)
+             If Trim(powerpntFilePath) <> "" Then
+                If subObjFSO.FileExists(powerpntFilePath) Then
+                    officeVersion = subObjFSO.GetFileVersion(powerpntFilePath)
+                End If
+             Else
+                puplishFilePath = ReadingValueInReg(HKEY_LOCAL_MACHINE, "SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\MSPUB.EXE", "", 1)
+                If Trim(puplishFilePath) <> "" Then
+                    If subObjFSO.FileExists(puplishFilePath) Then
+                      officeVersion = subObjFSO.GetFileVersion(puplishFilePath)
+                    End If
+                Else
+                    outlookFilePath = ReadingValueInReg(HKEY_LOCAL_MACHINE, "SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\OUTLOOK.exe", "", 1)
+                    If Trim(outlookFilePath) <> "" Then
+                      If subObjFSO.FileExists(outlookFilePath) Then
+                         officeVersion = subObjFSO.GetFileVersion(outlookFilePath)
+                      End If
+                    Else
+                      If GetOSBitNumber() = 64 Then
+                         wordFilePath = ReadingValueInReg(HKEY_LOCAL_MACHINE, "SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\App Paths\Winword.exe", "", 1)
+                         If Trim(wordFilePath) <> "" Then
+                            If subObjFSO.FileExists(wordFilePath) Then
+                                officeVersion = subObjFSO.GetFileVersion(wordFilePath)
+                            End If
+                         Else
+                            excelFilePath = ReadingValueInReg(HKEY_LOCAL_MACHINE, "SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\App Paths\excel.exe", "", 1)
+                            If Trim(excelFilePath) <> "" Then
+                                If subObjFSO.FileExists(excelFilePath) Then
+                                  officeVersion = subObjFSO.GetFileVersion(excelFilePath)
+                                End If
+                            Else
+                                powerpntFilePath = ReadingValueInReg(HKEY_LOCAL_MACHINE, "SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\App Paths\powerpnt.exe", "", 1)
+                                If Trim(powerpntFilePath) <> "" Then
+                                  If subObjFSO.FileExists(powerpntFilePath) Then
+                                     officeVersion = subObjFSO.GetFileVersion(powerpntFilePath)
+                                  End If
+                                Else
+                                  puplishFilePath = ReadingValueInReg(HKEY_LOCAL_MACHINE, "SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\App Paths\MSPUB.EXE", "", 1)
+                                  If Trim(puplishFilePath) <> "" Then
+                                     If subObjFSO.FileExists(puplishFilePath) Then
+                                        officeVersion = subObjFSO.GetFileVersion(puplishFilePath)
+                                     End If
+                                  Else
+                                     outlookFilePath = ReadingValueInReg(HKEY_LOCAL_MACHINE, "SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\App Paths\OUTLOOK.exe", "", 1)
+                                     If Trim(outlookFilePath) <> "" Then
+                                        If subObjFSO.FileExists(outlookFilePath) Then
+                                            officeVersion = subObjFSO.GetFileVersion(outlookFilePath)
+                                        End If
+                                     End If
+                                  End If
+                                End If
+                            End If
+                         End If
+                      End If
+                    End If
+                End If
+             End If
+          End If
+        End If
+    
+        On Error GoTo 0
+    
+        GetOfficeVersion = officeVersion
+    End Function
+
+    '===========================================================
+    Function GetMachineAssetTag()
+    On Error Resume Next
+        'Returns null if not set
+        Err.Clear
+        Dim strComputer: strComputer = "."
+        Dim objWMIServices: Set objWMIServices = GetObject("winmgmts:" & "{impersonationLevel=impersonate}!\\" & strComputer & "\root\cimv2")
+        Dim colSMBIOS: Set colSMBIOS = objWMIServices.ExecQuery("Select SMBIOSAssetTag from Win32_SystemEnclosure")
+        Dim objSMBIOS
+        Dim strGetMachineAssetTag
+        For Each objSMBIOS In colSMBIOS
+            strGetMachineAssetTag = objSMBIOS.SMBIOSAssetTag
+        Next
+        If Err.Number <> 0 Then
+            GetMachineAssetTag = "Err"
+        Else
+            GetMachineAssetTag = strGetMachineAssetTag
+        End If
+        Err.Clear
+        On Error GoTo 0
+    End Function
+    
+    '===========================================================
+    Function GetOSBitNumber()
+    On Error Resume Next
+    Err.Clear
+        Dim wshShell: Set wshShell = CreateObject("WScript.Shell")
+        Dim KeyValue: KeyValue = "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment\PROCESSOR_ARCHITECTURE"
+        Dim strVersion: strVersion = wshShell.RegRead(KeyValue)
+        Dim osVersionBitNo
+        If InStr(strVersion, "86") > 0 Then
+            osVersionBitNo = 32
+        Else
+            osVersionBitNo = 64
+        End If
+        If Err.Number <> 0 Then
+            GetOSBitNumber = 0
+        Else
+            GetOSBitNumber = osVersionBitNo
+        End If
+        Err.Clear
+        On Error GoTo 0
+        Set wshShell = Nothing
+    End Function
+
+    '===========================================================
+    Function GetMaxClockSpeed()
+    On Error Resume Next
+        Err.Clear
+        Dim strComputer: strComputer = "."
+        Dim strGetMaxClockSpeed
+        Dim objWMIService: Set objWMIService = GetObject("winmgmts:\\" & strComputer & "\root\cimv2")
+        Dim colItems, objItem: Set colItems = objWMIService.ExecQuery("Select MaxClockSpeed from Win32_Processor")
+    
+        For Each objItem In colItems
+            strGetMaxClockSpeed =  objItem.MaxClockSpeed
+        Next
+        GetMaxClockSpeed = strGetMaxClockSpeed
+        Err.Clear
+        On Error GoTo 0
+    End Function
+    
+    '===========================================================
+    Function GetTotalAndAvailableRamForLog()
+    On Error Resume Next
+    Dim strLogonUser
+    Dim strComputer
+    Dim objWMIService
+    Dim perfData
+    Dim entry
+    Dim strRam
+    
+        strComputer = "."
+        Set objWMIService = GetObject("winmgmts:\\.\root\cimv2")
+        
+'        Set objWMIService = GetObject("winmgmts:" _
+'        & "{impersonationLevel=impersonate}!\\" _
+'        & strComputer & "\root\cimv2")
+       
+        'Get Available Ram
+        Set perfData = objWMIService.ExecQuery _
+            ("Select * from Win32_PerfFormattedData_PerfOS_Memory")
+        For Each entry In perfData
+            strRam = Round((entry.AvailableBytes / 2^30), 2)
+        Next
+	
+    
+        'Get Total Ram
+        Set perfData = objWMIService.ExecQuery _
+            ("Select * from Win32_Computersystem")
+        For Each entry In perfData
+            strRam = strRam & """,""" 
+            strRam = strRam & Round((entry.TotalPhysicalMemory / 2^30), 2)
+        Next
+        GetTotalAndAvailableRamForLog = """" & strRam & """"
+        Set objWMIService = Nothing
+        'Set WS = Nothing
+    End Function
+
+    '===========================================================
+    Sub WriteToLog(strFilePath, strText)
+    On Error Resume Next
+        If Len(strFilePath) > 1 Then
+            'Failure to Log will not stop this script
+            Const ForAppending = 8
+            Dim objNetwork
+            Dim fso
+            Dim tf
+            Set objNetwork = CreateObject("WScript.Network")
+            Set fso = CreateObject("Scripting.FileSystemObject")
+            If Not fso.FileExists(strFilePath) Then
+                Set tf = fso.OpenTextFile(strFilePath, ForAppending, True)
+                tf.WriteLine gstrLogHeader 
+                ' """UserName"",""MachineName"",""Date Time"",""Local Drive"",""Local Drive Free"","" Local Drive Available"",""Local Drive Percent Available"","" Local Drive FileSystem"",""CPU Max Clock Speed"",""Machine Asset Tag"",""Available RAM Gb"",""Total RAM Gb"",""Horizontal Screen Resolution"","" Vertical Screen Resolution"","" Dpi Width"","" Dpi Height"",""OS Bit"",""Office Version"""
+                tf.Close
+            End If
+            Set tf = fso.OpenTextFile(strFilePath, ForAppending, True)
+            tf.WriteLine """" & GetMachineUserName & """,""" & GetMachineName & """,""" & Now() & """," & strText
+            tf.Close
+            Set fso = Nothing
+            Set tf = Nothing
+            Set objNetwork = Nothing
+        End If
+    End Sub
+
+    '===========================================================
+    Function GetIniValue(strFilePath, strSection, strKey)
+
+        Const ForReading = 1
+    
+        Dim fso ' As Scripting.FileSystemObject
+        Dim tf ' As Scripting.TextStream
+        Dim strLine
+        Dim nEqualPos
+        Dim strLeftString
+
+        GetIniValue = ""
+
+        Set fso = CreateObject("Scripting.FileSystemObject") ' New Scripting.FileSystemObject
+
+        If fso.FileExists(strFilePath) Then
+
+            Set tf = fso.OpenTextFile(strFilePath, ForReading, False)
+
+            Do While tf.AtEndOfStream = False
+
+                ' Continue with next line
+                strLine = Trim(tf.ReadLine)
+
+                ' Check if section is found in the current line
+                If LCase(strLine) = "[" & LCase(strSection) & "]" Then
+
+                    Do While tf.AtEndOfStream = False
+
+                        ' Continue with next line
+                        strLine = Trim(tf.ReadLine)
+
+                        ' Abort loop if next section is reached
+                        If Left(strLine, 1) = "[" Then
+                            Exit Do
+                        End If
+
+                        ' Find position of equal sign in the line
+                        nEqualPos = InStr(1, strLine, "=", 1)
+                        If nEqualPos > 0 Then
+                            strLeftString = Trim(Left(strLine, nEqualPos - 1))
+                            ' Check if item is found in the current line
+                            If LCase(strLeftString) = LCase(strKey) Then
+                                GetIniValue = Trim(Mid(strLine, nEqualPos + 1))
+                                ' Abort loop when item is found
+                                Exit Do
+                            End If
+                        End If
+
+                    Loop
+
+                    Exit Do
+
+                End If
+
+            Loop
+
+            tf.Close
+
+        End If
+
+    End Function
+      
+    '===========================================================
+    Function IIf(Expression, TruePart, FalsePart)
+    'The Block if is faster and only evaluates one part at a time minimizing errors
+        If Expression Then
+            IIf = TruePart
+        Else
+            IIf = FalsePart
+        End If
+    End Function
+
+    '===========================================================
+    Sub WaitPingTimes(ByRef PingTimes)
+        'Alternatively use: http://blogs.technet.com/b/heyscriptingguy/archive/2006/03/30/how-can-i-temporarily-pause-a-script-in-an-hta.aspx
+        Dim wshShell
+        Dim Command
+        Set wshShell = CreateObject("WScript.Shell")
+        Command = "cmd /c ping -n " & PingTimes + 1 & " 127.0.0.1"
+        wshShell.Run Command, 0, True
+        Set wshShell = Nothing
+    End Sub
+
+
+    '===========================================================    
+    '----------------------------------------------------------------------
+    ' - There are several methods to get the current directory of the HTA -
+    '----------------------------------------------------------------------
+    'From testing don't use the following
+    'This method drops the server path for network paths
+    'strPath =  Left(Document.Location.pathname, InStrRev(Document.Location.pathname, "\") - 1) & "\Main.hta"
+    'This method works fine if the HTA directly executed,
+    'but if explorer.exe or cscript.exe executes the hta this method returns the %windir% dictory
+    'Dim objScripShell
+    'Set objScripShell = CreateObject("WScript.Shell")
+    'strPath =  objScripShell.CurrentDirectory & "\Main.hta"
+    Function GetCurrentPath()
+
+        Dim strPath
+        strPath = UrlDecode(Document.Location.href)
+        strPath = Left(strPath, InStrRev(strPath, "/") - 1)
+        strPath = Replace(strPath, "/", "\")
+
+        'URLs that begin with a drive letter will begin with 'file:\\\' Check this first
+        If Left(strPath, 8) = "file:\\\" Then
+        strPath = Right(strPath, Len(strPath) - 8)
+        End If
+
+        'URLs that begin with a server name will begin with 'file:'
+        If Left(strPath, 5) = "file:" Then
+        strPath = Right(strPath, Len(strPath) - 5)
+        End If
+
+        GetCurrentPath = strPath
+
+    End Function
+
+    '===========================================================
+    Function UrlEncode(s)
+    Dim JSEngine
+    Set JSEngine = CreateObject("MSScriptControl.ScriptControl")
+        JSEngine.Language = "JScript"
+        UrlEncode = JSEngine.CodeObject.encodeURIComponent(s)
+        UrlEncode = Replace(UrlEncode, "'", "%27")
+        UrlEncode = Replace(UrlEncode, """", "%22")
+    End Function
+
+    '===========================================================
+    Function UrlDecode(s)
+    Dim JSEngine
+    Set JSEngine = CreateObject("MSScriptControl.ScriptControl")
+        JSEngine.Language = "JScript"
+        UrlDecode = Replace(s, "+", " ")
+        UrlDecode = JSEngine.CodeObject.decodeURIComponent(UrlDecode)
+    End Function
+
+    '===========================================================
+    Sub WriteHtmlLine(strLine)
+        Document.All.DisplayedContent.InnerHTML = DisplayedContent.InnerHTML & vbCrLf & strLine
+        If fIncrementOnHtmlWrite Then
+            If x<50 Then
+		IncrementProgress 1
+            Else
+                IncrementProgress .5
+            End If
+        End If
+        RefreshDocument
+
+    End Sub
+
+    '===========================================================
+    Sub IncrementProgress(step)
+    Dim d
+        x = x + step
+        If x >= 100 Then
+            x = 100
+        End If
+        d = Round(x / (y / w) + 1, 0)
+        Document.Title = strcAppName & " " & FormatPercent(x / y, 0) & MyTitle
+        Document.All.ProgBarText.innerText = x & "/" & y
+        Document.All.ProgBarDone.innerText = String(d, " &thinsp;")
+        If d < w Then
+            Document.All.ProgBarToDo.innerText = String(w - d, " &thinsp;") & "|"
+        Else
+            Document.All.ProgBarToDo.innerText = "|"
+        End If
+        If x >= y Then
+            'Document.all.ProgBarToDo.innerText = ""
+            'x = 0
+            'd = Round(x / (y / w) + 1, 0)
+            Document.Title = strcAppName & " " & "Completed"
+            'Document.all.ProgBarText.innerText = ""
+            'Document.all.ProgBarDone.innerText = ""
+        End If
+
+    End Sub
+
+    '===========================================================
+    Sub RefreshDocument()
+        IncrementProgress 1
+        Dim objShell
+        Dim strCmd
+        Dim i
+
+            Set objShell = CreateObject("WScript.Shell")
+            strCmd = "%COMSPEC% /c"
+            objShell.Run strCmd, 0, 1
+    End Sub
+
+    '===========================================================
+    'On error, cycling through three different methods to grab the computer name
+    'from fastest to slowest (2000x, 150x, 1x)
+    Function GetMachineName() 'As String
+    On Error Resume Next
+    Dim strComputerName 'As String
+        If Err.Number <> 0 Or Len(strComputerName) = 0 Then
+            Err.Clear
+            Dim WSNetwork 'As Object:
+            Set WSNetwork = CreateObject("WScript.Network")
+            strComputerName = WSNetwork.ComputerName
+            Set WSNetwork = Nothing
+            If Err.Number <> 0 Or Len(strComputerName) = 0 Then
+                'This is not the preferred method, 'As it is maintained by CIM
+                'and WMI Collection is slow (only 100 queries/Second)
+                Dim objColItem, objColItems, objWMIService
+                Set objWMIService = GetObject("winmgmts:\\.\root\cimv2")
+                Set objColItems = objWMIService.ExecQuery _
+                    ("Select Name from Win32_Computersystem")
+                For Each objColItem In objColItems
+                    GetMachineName = objColItem.Name
+                Next
+                'Cleanup
+                Set objColItem = Nothing: Set objColItems = Nothing: Set objWMIService = Nothing
+            End If
+        End If
+        GetMachineName = strComputerName
+    End Function
+
+    '===========================================================
+    Function GetMachineUserName() 'As String
+    On Error Resume Next
+        Dim WSNetwork 'As Object
+        Set WSNetwork = CreateObject("WScript.Network")
+        Dim strUserName 'As String
+        strUserName = WSNetwork.UserName
+    
+        Set WSNetwork = Nothing
+        If Err.Number <> 0 Or Len(strUserName) = 0 Then
+            Dim objColItem 'As Object
+            Dim objColItems 'As Object
+            Dim objWMIService 'As Object
+            Set objWMIService = GetObject("winmgmts:\\.\root\cimv2")
+            Set objColItems = objWMIService.ExecQuery _
+                ("Select Username from Win32_Computersystem")
+            For Each objColItem In objColItems
+                GetMachineUserName = objColItem.UserName
+            Next
+            Set objColItem = Nothing: Set objColItems = Nothing: Set objWMIService = Nothing
+        Else
+            GetMachineUserName = strUserName
+        End If
+    End Function
+
+    '===========================================================
+    Function GetMachineDomainName() 'As String
+    On Error Resume Next
+    Dim WSNetwork 'As Object
+    Set WSNetwork = CreateObject("WScript.Network")
+    Dim strUserDomain 'As String
+    strUserDomain = WSNetwork.UserDomain
+        Set WSNetwork = Nothing
+        If Err.Number <> 0 Or Len(strUserDomain) = 0 Then
+        Dim objColItem 'As Object
+        Dim objColItems 'As Object
+        Dim objWMIService 'As Object
+
+            Set objWMIService = GetObject("winmgmts:\\.\root\cimv2")
+            Set objColItems = objWMIService.ExecQuery _
+                ("Select Username from Win32_Computersystem")
+            For Each objColItem In objColItems
+                Dim strUserName 'As String
+                strUserName = objColItem.UserName
+                GetMachineDomainName = Left(strUserName, InStr(1, strUserName, "\") - 1)
+            Next
+            Set objColItem = Nothing: Set objColItems = Nothing: Set objWMIService = Nothing
+        Else
+            GetMachineDomainName = strUserDomain
+        End If
+    End Function
+
+    '===========================================================
+    Function GetMachineDrives() 'As String
+    Dim strDriveLetter 'As String
+    Dim lngDriveLetterValue 'As Long ''As Long
+    Dim fso 'As Object ' 'As FileSystemObject
+    Dim fsoDrive 'As Object
+    Dim strCurrentDrive 'As String
+    Dim strConvertedDrive 'As String
+
+        Set fso = CreateObject("Scripting.FileSystemObject")
+        'We are looping from A to Z
+        lngDriveLetterValue = 65 ' Letters A (65) to Z (90)
+        Do While lngDriveLetterValue < 91
+            strDriveLetter = Chr(lngDriveLetterValue)
+            If fso.DriveExists(strDriveLetter) Then
+                Set fsoDrive = fso.GetDrive(strDriveLetter)
+                    strCurrentDrive = strDriveLetter & ": "
+                    GetMachineDrives = GetMachineDrives & _
+                        strCurrentDrive & ","
+            End If
+            lngDriveLetterValue = lngDriveLetterValue + 1
+        Loop
+        'Remove trailing ,
+        If Len(strDriveLetter) <> 0 Then
+            strDriveLetter = Left(strDriveLetter, Len(strDriveLetter) - 1)
+        End If
+        Set fso = Nothing
+    End Function
+
+    '===========================================================
+    Function GetMachineLogicalDriveInformationForLog() ' As String
+    ' This currently only returs the last local disk found, and will need to be rewritten if there are multiple local drives
+    ' http://msdn.microsoft.com/en-us/library/aa394592(VS.85).aspx
+	on error resume next
+        Dim objWMI
+        Dim colDisks
+        Dim objDisk
+        Dim strDiskDeviceId
+        Dim strDiskFileSystem
+        Dim dblDiskFreeSpaceGb
+        Dim dblDiskAvailableSpaceGb
+        Dim dblDiskPercentFree
+            Set objWMI = GetObject("winmgmts:\\.\root\cimv2")
+            Set colDisks = objWMI.ExecQuery("Select * from Win32_LogicalDisk")
+            For Each objDisk In colDisks
+                With objDisk
+                    If .DriveType = 3 Then 'Is a local Disk
+                        strDiskDeviceId = strDiskDeviceId & .DeviceID
+                        dblDiskFreeSpaceGb = .FreeSpace / 2 ^ 30
+                        dblDiskAvailableSpaceGb = .Size / 2 ^ 30
+                        dblDiskPercentFree = dblDiskFreeSpaceGb / dblDiskAvailableSpaceGb
+                        strDiskFileSystem = .FileSystem
+                    End If
+                End With
+            Next
+            'We add items one line at a time to ensure the correct number of commas are returned
+            Dim strVal
+            strVal = """"
+            strVal = strVal & strDiskDeviceId 
+            strVal = strVal & ""","""
+            strVal = strVal & Round(dblDiskFreeSpaceGb, 2)
+            strVal = strVal & ""","""
+            strVal = strVal & Round(dblDiskAvailableSpaceGb, 2)
+            strVal = strVal & ""","""
+            strVal = strVal & Round(dblDiskPercentFree, 2)
+            strVal = strVal & """,""" 
+            strVal = strVal & strDiskFileSystem 
+            strVal = strVal & """"
+            GetMachineLogicalDriveInformationForLog = strVal 
+
+            'Cleanup
+            Set objWMI = Nothing
+            Set colDisks = Nothing
+    End Function
+
+    Function GetMachineNetworkDrives(fPrintersOnly) 'As String
+    If Len(fPrintersOnly) = 0 Then
+      fPrintersOnly = False
+    End If
+    'Enumerating network drives will also list Network that have been disconnected
+    'but not yet forgotten, and network shares currently open
+    Dim wshNetwork 'As Object
+    Set wshNetwork = CreateObject("WScript.Network")
+    Dim oDrives 'As Object
+    Set oDrives = wshNetwork.EnumNetworkDrives
+    Dim oPrinters 'As Object
+    Set oPrinters = wshNetwork.EnumPrinterConnections
+    Dim intDriveEnum 'As Integer
+    Dim intPrinterEnum 'As Integer
+        If Not fPrintersOnly Then
+            GetMachineNetworkDrives = "<br/>" & "Network drive mappings:" & "<br/>"
+            For intDriveEnum = 0 To oDrives.Count - 1 Step 2
+                GetMachineNetworkDrives = GetMachineNetworkDrives & "Drive " & _
+                    oDrives.Item(intDriveEnum) & "(" & oDrives.Item(intDriveEnum + 1) & ")" & "<br/>"
+            Next
+        End If
+        GetMachineNetworkDrives = GetMachineNetworkDrives & "<br/>" & "Network printer mappings:" & "<br/>"
+        For intPrinterEnum = 0 To oPrinters.Count - 1 Step 2
+            GetMachineNetworkDrives = GetMachineNetworkDrives & """" & "Port " & _
+                oPrinters.Item(intPrinterEnum) & "(" & oPrinters.Item(intPrinterEnum + 1) & ")" & "<br/>"
+        Next
+    End Function
+
+    Sub BuildDir(strPath)
+        Dim fso ' As Scripting.FileSystemObject
+        Dim arryPaths
+        Dim strBuiltPath
+        Dim intDir
+        
+        Set fso = CreateObject("Scripting.FileSystemObject") ' New Scripting.FileSystemObject
+        arryPaths = Split(strPath, "\")
+        For intDir = 0 To UBound(arryPaths)
+            strBuiltPath = strBuiltPath & arryPaths(intDir) & "\"
+            If Not fso.FolderExists(strBuiltPath) Then
+                fso.CreateFolder strBuiltPath
+            End If
+        Next
+        
+    End Sub
+
+</SCRIPT>
+</head>
+<body>
+  <? See the following for how to embedding Image as a blob
+    http://www.john-am.com/2010/07/building-a-self-contained-hta-with-embedded-images-and-icons/
+    http://msdn.microsoft.com/en-us/library/ms536482%28VS.85%29.aspx
+    1) Compress the image with https://squoosh.app/
+    2) Convert to base 64 with https://www.base64-image.de/
+  ?>
+  <img align="middle" src="
+data:image/png;base64,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
+" alt "R (logo)">
+  </img>
+  <br/>
+  <span id="ProgBarText"></span><br/>
+  <span id="ProgressBar">
+    <span id="ProgBarDone" style="background-color: #3399FF"></span>
+    <font color="#FFFFFF">
+      <span id="ProgBarToDo"style="background-color: #C0C0C0"></span>
+    </font>
+  </span>
+  <br/>
+  <span id = "DisplayedContent"></span>
+</body>
+</html>
+
+
