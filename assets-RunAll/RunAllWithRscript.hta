@@ -132,79 +132,79 @@ idTimer = Window.setTimeout("ExecuteActions", 50, "VBScript")
         WriteHtmlLine "<h1>Execute Scripts</h1>"
         WriteHtmlLine "<h2>" & strProjectName & "</h2>"
 
-Dim strRscriptExe
-Dim intPathNumber
-intPathNumber = 1
-Do 
-    '"%userprofile%\Documents\R-3.5.1\bin\x64\Rscript.exe"   
-    strRscriptExe =  wshShell.ExpandEnvironmentStrings( _
-        GetIniValue( _
-            strConfigIniFilePath, _
-            "Config", _
-            "RscriptexePath" & intPathNumber _
-        ) _
-    )
-    intPathNumber = intPathNumber + 1
-Loop Until intPathNumber > 10 Or FileExists(strRscriptExe)
-WriteHtmlLine "Found Rscript.exe at " & strRscriptExe & "<br/>"
+    Dim strRscriptExe
+    Dim intPathNumber
+    intPathNumber = 1
+    Do 
+        '"%userprofile%\Documents\R-3.5.1\bin\x64\Rscript.exe"   
+        strRscriptExe =  wshShell.ExpandEnvironmentStrings( _
+            GetIniValue( _
+                strConfigIniFilePath, _
+                "Config", _
+                "RscriptexePath" & intPathNumber _
+            ) _
+        )
+        intPathNumber = intPathNumber + 1
+    Loop Until intPathNumber > 10 Or FileExists(strRscriptExe)
+    WriteHtmlLine "Found Rscript.exe at " & strRscriptExe & "<br/>"
+    
+    Dim strFolder
+    strFolder = ParentFolder(GetCurrentPath)
+    WriteHtmlLine "Using script folder " & strFolder & "<br/>"
+    Dim strCommand
+    strCommand = """" & strRscriptExe & """ """ & strFolder & "\" & strRunScriptName & """"
+    WriteHtmlLine "Running command: " & strcommand  & "<br/>"
+    on error resume next
+    wshShell.Run strCommand, 0, True
+    if err.number <> 0 then
+        msgbox "Erorr:" & err.Number & vbcrlf & err.Description, ,  strProjectName
+    end if
+    ' ------------------------------------------------------------------------- 
+    ' Logging use 
+    ' ------------------------------------------------------------------------- 
+    If FolderExists(ParentFolder(strLogPath)) Then
+        x = 85 
+        WriteHtmlLine "<h1>Logging Script Run</h1>" 
+        'Gather Machine Information (calling WriteToLog enters the UserName, Machine Name, and ...)
+        Dim strLogDetails
+        'WriteHtmlLine _
+        '    "<br/>" & "-------------Drives In Use-------------" & "<br/>" & _
+        'GetMachineDrives & GetMachineNetworkDrives(False)
+        'Add HDD Free Space and other machine information to a WipeLog on the Network
+        'We each item on a seperate line to ensure that we have the correct number of commas
+        strLogDetails = strProjectName
+        strLogDetails = strLogDetails & ",""" 
+        strLogDetails = strLogDetails & GetMachineLogicalDriveInformationForLog 'Local Drive,Local Drive Free, Local Drive Available ,Local Drive Percent Available, Local Drive FileSystem
+        strLogDetails = strLogDetails & ",""" 
+        strLogDetails = strLogDetails & GetMaxClockSpeed 'CPU Max Clock Speed
+        strLogDetails = strLogDetails & """,""" 
+        strLogDetails = strLogDetails & GetMachineAssetTag 'Machine Asset Tag
+        strLogDetails = strLogDetails & """," 
+        strLogDetails = strLogDetails & GetTotalAndAvailableRamForLog 'Available RAM Gb,Total RAM Gb
+        strLogDetails = strLogDetails & ",""" 
+        strLogDetails = strLogDetails & GetOSBitNumber 'OS Bit
+        strLogDetails = strLogDetails & """,""" 
+        strLogDetails = strLogDetails & GetOfficeVersion 'Office Version
+        strLogDetails = strLogDetails & """" 
+        WriteHtmlLine "Writing LogDetails to Log Path:" & strLogPath & "<br/>" & gstrLogHeader &  "<br/>" & strLogDetails 
+        WriteToLog strLogPath, strLogDetails             
+    End If
 
-Dim strFolder
-strFolder = ParentFolder(GetCurrentPath)
-WriteHtmlLine "Using script folder " & strFolder & "<br/>"
-Dim strCommand
-strCommand = """" & strRscriptExe & """ """ & strFolder & "\" & strRunScriptName & """"
-WriteHtmlLine "Running command: " & strcommand  & "<br/>"
-on error resume next
-wshShell.Run strCommand, 0, True
-if err.number <> 0 then
-    msgbox "Erorr:" & err.Number & vbcrlf & err.Description, ,  strProjectName
-end if
-        ' ------------------------------------------------------------------------- 
-        ' Logging use 
-        ' ------------------------------------------------------------------------- 
-        If FolderExists(ParentFolder(strLogPath)) Then
-            x = 85 
-            WriteHtmlLine "<h1>Logging Script Run</h1>" 
-            'Gather Machine Information (calling WriteToLog enters the UserName, Machine Name, and ...)
-            Dim strLogDetails
-            'WriteHtmlLine _
-            '    "<br/>" & "-------------Drives In Use-------------" & "<br/>" & _
-            'GetMachineDrives & GetMachineNetworkDrives(False)
-            'Add HDD Free Space and other machine information to a WipeLog on the Network
-            'We each item on a seperate line to ensure that we have the correct number of commas
-            strLogDetails = strProjectName
-            strLogDetails = strLogDetails & ",""" 
-            strLogDetails = strLogDetails & GetMachineLogicalDriveInformationForLog 'Local Drive,Local Drive Free, Local Drive Available ,Local Drive Percent Available, Local Drive FileSystem
-            strLogDetails = strLogDetails & ",""" 
-            strLogDetails = strLogDetails & GetMaxClockSpeed 'CPU Max Clock Speed
-            strLogDetails = strLogDetails & """,""" 
-            strLogDetails = strLogDetails & GetMachineAssetTag 'Machine Asset Tag
-            strLogDetails = strLogDetails & """," 
-            strLogDetails = strLogDetails & GetTotalAndAvailableRamForLog 'Available RAM Gb,Total RAM Gb
-            strLogDetails = strLogDetails & ",""" 
-            strLogDetails = strLogDetails & GetOSBitNumber 'OS Bit
-            strLogDetails = strLogDetails & """,""" 
-            strLogDetails = strLogDetails & GetOfficeVersion 'Office Version
-            strLogDetails = strLogDetails & """" 
-            WriteHtmlLine "Writing LogDetails to Log Path:" & strLogPath & "<br/>" & gstrLogHeader &  "<br/>" & strLogDetails 
-            WriteToLog strLogPath, strLogDetails             
-        End If
-
-        Dim strCompletionNotice
-        strCompletionNotice = strProjectName  & " Complete"
-        x = 94
-        WriteHtmlLine "<h2>" & strCompletionNotice & "</h2>"
-        'Close window in 5 seconds
-        Dim intSecondsRemaining
-        intSecondsRemaining = 5        
-        WriteHtmlLine "<br/> Closing window in "
-        Do 
-            WriteHtmlLine intSecondsRemaining & "..." 
-            WaitPingTimes 1
-            intSecondsRemaining = intSecondsRemaining - 1
-        Loop until intSecondsRemaining < 1
-        Window.Close
-    End Sub 
+    Dim strCompletionNotice
+    strCompletionNotice = strProjectName  & " Complete"
+    x = 94
+    WriteHtmlLine "<h2>" & strCompletionNotice & "</h2>"
+    'Close window in 5 seconds
+    Dim intSecondsRemaining
+    intSecondsRemaining = 5        
+    WriteHtmlLine "<br/> Closing window in "
+    Do 
+        WriteHtmlLine intSecondsRemaining & "..." 
+        WaitPingTimes 1
+        intSecondsRemaining = intSecondsRemaining - 1
+    Loop until intSecondsRemaining < 1
+    Window.Close
+End Sub 
 
     '===========================================================
     'reading value in Registry
