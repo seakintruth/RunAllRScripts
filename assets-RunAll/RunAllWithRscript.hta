@@ -46,13 +46,13 @@ Option Explicit
 'C105 Health Physicist
 'jeremy.gerdes@navy.mil
     'http://www.copyright.gov/title17/
-    'In accordance with 17 U.S.C. ง 105 This work is 'noncopyright' or 'Public Domain'
+    'In accordance with 17 U.S.C. ยง 105 This work is 'noncopyright' or 'Public Domain'
         'Subject matter of copyright: United States Government works
         'Copyright protection under this title is not available for
         'any work of the United States Government, but the United States
         'Government is not precluded from receiving and holding copyrights
         'transferred to it by assignment, bequest, or otherwise.
-        'as defined by 17 U.S.C ง 101
+        'as defined by 17 U.S.C ยง 101
         '...
         'A "work of the United States Government" is a work prepared by an
         'officer or employee of the United States Government as part of that
@@ -140,12 +140,12 @@ idTimer = Window.setTimeout("ExecuteActions", 50, "VBScript")
         strRscriptExe =  wshShell.ExpandEnvironmentStrings( _
             GetIniValue( _
                 strConfigIniFilePath, _
-                "Config", _
-                "RscriptexePath" & intPathNumber _
+                "Rscript", _
+                intPathNumber _
             ) _
         )
         intPathNumber = intPathNumber + 1
-    Loop Until intPathNumber > 10 Or FileExists(strRscriptExe)
+    Loop Until intPathNumber > 100 Or FileExists(strRscriptExe)
     WriteHtmlLine "Found Rscript.exe at " & strRscriptExe & "<br/>"
     
     Dim strFolder
@@ -882,7 +882,6 @@ exitFunction:
         Next
         
     End Sub
-
 </SCRIPT>
 </head>
 <body>
