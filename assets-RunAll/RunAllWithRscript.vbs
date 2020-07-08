@@ -5,22 +5,22 @@ Const gstrLogHeader = """ProjectName"",""UserName"",""MachineName"",""Date Time"
 'For Placing MsgBox on top
 Const mdblcAllwaysOnTop = 262144
 
-'------------for Progress bar --------------
-Public w
-Public x
-Public y
+'------------for Progress bar in hta --------------
+'Public w
+'Public x
+'Public y
 Public MyTitle
-Public fIncrementOnHtmlWrite
+'Public fIncrementOnHtmlWrite
 
-w = 100
-x = 0
-y = 100
+'w = 100
+'x = 0
+'y = 100
 MyTitle = " Progress"
 
 'For pauses in code to allow for document updates after document finishes loading
-Public idTimer
+'Public idTimer
 'Initiate Actions, while allowing page to finalize
-idTimer = Window.setTimeout("ExecuteActions", 50, "VBScript")
+'idTimer = Window.setTimeout("ExecuteActions", 50, "VBScript")
     '===========================================================
     Sub ExecuteActions()
     '===========================================================
@@ -66,8 +66,8 @@ idTimer = Window.setTimeout("ExecuteActions", 50, "VBScript")
         ' -------------------------------------------------------------------------
         ' Execute Scripts
         ' -------------------------------------------------------------------------
-        WriteHtmlLine "<h1>Execute Scripts</h1>"
-        WriteHtmlLine "<h2>" & strProjectName & "</h2>"
+        'WriteHtmlLine "<h1>Execute Scripts</h1>"
+        'WriteHtmlLine "<h2>" & strProjectName & "</h2>"
 
     Dim strRscriptExe
     Dim intPathNumber
@@ -83,14 +83,14 @@ idTimer = Window.setTimeout("ExecuteActions", 50, "VBScript")
         )
         intPathNumber = intPathNumber + 1
     Loop Until intPathNumber > 100 Or FileExists(strRscriptExe)
-    WriteHtmlLine "Found Rscript.exe at " & strRscriptExe & "<br/>"
+    'WriteHtmlLine "Found Rscript.exe at " & strRscriptExe & "<br/>"
     
     Dim strFolder
     strFolder = ParentFolder(GetCurrentPath)
-    WriteHtmlLine "Using script folder " & strFolder & "<br/>"
+    'WriteHtmlLine "Using script folder " & strFolder & "<br/>"
     Dim strCommand
     strCommand = """" & strRscriptExe & """ """ & strFolder & "\" & strRunScriptName & """"
-    WriteHtmlLine "Running command: " & strcommand  & "<br/>"
+    'WriteHtmlLine "Running command: " & strcommand  & "<br/>"
     on error resume next
     wshShell.Run strCommand, 0, True
     if err.number <> 0 then
@@ -100,8 +100,8 @@ idTimer = Window.setTimeout("ExecuteActions", 50, "VBScript")
     ' Logging use 
     ' ------------------------------------------------------------------------- 
     If FolderExists(ParentFolder(strLogPath)) Then
-        x = 85 
-        WriteHtmlLine "<h1>Logging Script Run</h1>" 
+        'x = 85 
+        'WriteHtmlLine "<h1>Logging Script Run</h1>" 
         'Gather Machine Information (calling WriteToLog enters the UserName, Machine Name, and ...)
         Dim strLogDetails
         'WriteHtmlLine _
@@ -123,20 +123,20 @@ idTimer = Window.setTimeout("ExecuteActions", 50, "VBScript")
         strLogDetails = strLogDetails & """,""" 
         strLogDetails = strLogDetails & GetOfficeVersion 'Office Version
         strLogDetails = strLogDetails & """" 
-        WriteHtmlLine "Writing LogDetails to Log Path:" & strLogPath & "<br/>" & gstrLogHeader &  "<br/>" & strLogDetails 
+        'WriteHtmlLine "Writing LogDetails to Log Path:" & strLogPath & "<br/>" & gstrLogHeader &  "<br/>" & strLogDetails 
         WriteToLog strLogPath, strLogDetails             
     End If
 
     Dim strCompletionNotice
     strCompletionNotice = strProjectName  & " Complete"
-    x = 94
-    WriteHtmlLine "<h2>" & strCompletionNotice & "</h2>"
+    'x = 94
+    'WriteHtmlLine "<h2>" & strCompletionNotice & "</h2>"
     'Close window in 5 seconds
     Dim intSecondsRemaining
     intSecondsRemaining = 5        
-    WriteHtmlLine "<br/> Closing window in "
+    'WriteHtmlLine "<br/> Closing window in "
     Do 
-        WriteHtmlLine intSecondsRemaining & "..." 
+        'WriteHtmlLine intSecondsRemaining & "..." 
         WaitPingTimes 1
         intSecondsRemaining = intSecondsRemaining - 1
     Loop until intSecondsRemaining < 1
@@ -546,79 +546,7 @@ exitFunction:
         GetCurrentPath = strPath
 
     End Function
-
-    '===========================================================
-    Function UrlEncode(s)
-    Dim JSEngine
-    Set JSEngine = CreateObject("MSScriptControl.ScriptControl")
-        JSEngine.Language = "JScript"
-        UrlEncode = JSEngine.CodeObject.encodeURIComponent(s)
-        UrlEncode = Replace(UrlEncode, "'", "%27")
-        UrlEncode = Replace(UrlEncode, """", "%22")
-    End Function
-
-    '===========================================================
-    Function UrlDecode(s)
-    Dim JSEngine
-    Set JSEngine = CreateObject("MSScriptControl.ScriptControl")
-        JSEngine.Language = "JScript"
-        UrlDecode = Replace(s, "+", " ")
-        UrlDecode = JSEngine.CodeObject.decodeURIComponent(UrlDecode)
-    End Function
-
-    '===========================================================
-    Sub WriteHtmlLine(strLine)
-        Document.All.DisplayedContent.InnerHTML = DisplayedContent.InnerHTML & vbCrLf & strLine
-        If fIncrementOnHtmlWrite Then
-            If x<50 Then
-		IncrementProgress 1
-            Else
-                IncrementProgress .5
-            End If
-        End If
-        RefreshDocument
-
-    End Sub
-
-    '===========================================================
-    Sub IncrementProgress(step)
-    Dim d
-        x = x + step
-        If x >= 100 Then
-            x = 100
-        End If
-        d = Round(x / (y / w) + 1, 0)
-        Document.Title = strcAppName & " " & FormatPercent(x / y, 0) & MyTitle
-        Document.All.ProgBarText.innerText = x & "/" & y
-        Document.All.ProgBarDone.innerText = String(d, " &thinsp;")
-        If d < w Then
-            Document.All.ProgBarToDo.innerText = String(w - d, " &thinsp;") & "|"
-        Else
-            Document.All.ProgBarToDo.innerText = "|"
-        End If
-        If x >= y Then
-            'Document.all.ProgBarToDo.innerText = ""
-            'x = 0
-            'd = Round(x / (y / w) + 1, 0)
-            Document.Title = strcAppName & " " & "Completed"
-            'Document.all.ProgBarText.innerText = ""
-            'Document.all.ProgBarDone.innerText = ""
-        End If
-
-    End Sub
-
-    '===========================================================
-    Sub RefreshDocument()
-        IncrementProgress 1
-        Dim objShell
-        Dim strCmd
-        Dim i
-
-            Set objShell = CreateObject("WScript.Shell")
-            strCmd = "%COMSPEC% /c"
-            objShell.Run strCmd, 0, 1
-    End Sub
-
+    
     '===========================================================
     'On error, cycling through three different methods to grab the computer name
     'from fastest to slowest (2000x, 150x, 1x)
