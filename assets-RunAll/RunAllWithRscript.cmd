@@ -1,15 +1,9 @@
 rem --------------------------Script Variables---------------------------------
-rem [TODO] read the 'R_Script_exe' value from registry, if not found read value from RunAll.ini
-rem could be... set R_Script_exe=%programfiles%\R\R-3.5.1\bin\x64\Rscript.exe
-rem set R_Script_exe=%userprofile%\Documents\R\R-3.5.1\bin\x64\Rscript.exe
-rem [TODO] read the 'R_Script_Name' value from the RunAll.ini file
-
-set R_Script_exe=%userprofile%\Documents\R-3.5.1\bin\x64\Rscript.exe
 set R_Script_Name=RunAll.R
 set /A display_error_seconds=10
 
 rem -------------------------Script properties-----------------------------------
-SETLOCAL EnableExtensions
+@setlocal enableextensions enabledelayedexpansion
 @echo off
 color b0
 cls
@@ -33,23 +27,44 @@ rem going to be asking for user input with 'set \p...'
 rem additionally nesting more than two if statements deep seems to fail? 
 rem but I haven't tested this... could have just been syntax issues
 
-if exist "%R_Script_exe%" (
-    rem @echo Found Rscript.exe at %R_Script_exe%
-) else (
+
+rem [TODO] read the 'R_Script_exe' value from registry, if not found read value from RunAll.ini
+
+rem read the 'R_Script_Name' value from the RunAll.ini file
+rem %userprofile%\Documents\R-3.5.1\bin\x64\Rscript.exe
+rem ReadIni function accepts the arguments File, Section, Key, Return
+set ScriptFolder=%~dp0
+rem Add Trailing slash if it's not there https://stackoverflow.com/questions/2866117
+IF NOT "%ScriptFolder:~-1%"=="\" SET "ScriptFolder=%ScriptFolder%\"
+
+for /l %%x in (1, 1, 100) do (
+    call ReadIni "%ScriptFolder%RunAll.ini", "Rscript", %%x, %R_Script_exe%
     if exist "%R_Script_exe%" (
-       rem @echo Found Rscript.exe at %R_Script_exe%
-    ) else (
-       set user_prompt=Enter the folder path of the file Rscript.exe:
-       CALL :ask_user_dir R_Script_exe_Directory, %user_prompt%, %display_error_seconds%
-       set R_Script_exe=%R_Script_exe_Directory%\Rscript.exe
-   )
+        rem @echo Found Rscript.exe
+        goto :EndRscriptSearch
+    )
+)
+
+rem could be... set R_Script_exe=%programfiles%\R\R-3.5.1\bin\x64\Rscript.exe
+rem or R_Script_exe=%userprofile%\Documents\R\R-3.5.1\bin\x64\Rscript.exe
+
+:EndRscriptSearch
+if exist "%R_Script_exe%" (
+    rem @echo at %R_Script_exe%
+) else (
+    set user_prompt=Enter the folder path of the file Rscript.exe:
+    CALL :ask_user_dir R_Script_exe_Directory, %user_prompt%, %display_error_seconds%
+    set R_Script_exe=%R_Script_exe_Directory%\Rscript.exe
 )
 
 rem set the expected script path to current working directory's parent
 
 echo on
-call :GetDirParentN R_Script_Path %__CD__% ".."
-echo %__CD__%
+
+rem the variable %__CD__% is a special variable that is this script's file path
+rem should be the same as %ScriptFolder%
+call :GetDirParentN R_Script_Path %ScriptFolder% ".."
+echo %ScriptFolder%
 echo %R_Script_Path%
 pause
 
@@ -79,6 +94,7 @@ if exist "%R_Script_exe%" (
     pause
 )
 EXIT /B %ERRORLEVEL%
+
 
 :setVariableValue 
     set %~1=%~2
@@ -135,8 +151,30 @@ EXIT /B 0
     ping -n %wait_delay% 127.0.0.1 > nul
 EXIT /B 0
 
-
-
 :GetDirParentN
     for %%I in ("%~2\%~3") do set "%~1=%%~fI"
 EXIT /B 0
+
+:ReadIni
+set file=%~1
+set area=[%~2]
+set key=%~3
+set currarea=
+for /f "usebackq delims=" %%a in ("!file!") do (
+    set ln=%%a
+    if "x!ln:~0,1!"=="x[" (
+        set currarea=!ln!
+    ) else (
+        for /f "tokens=1,2 delims==" %%b in ("!ln!") do (
+            set currkey=%%b
+            set currval=%%c
+            if "x!area!"=="x!currarea!" if "x!key!"=="x!currkey!" (
+rem                echo !currval!
+                set %~4=!currval!
+            )
+        )
+    )
+)
+
+EXIT /B 0
+
