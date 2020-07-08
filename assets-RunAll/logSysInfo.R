@@ -1,16 +1,23 @@
 # only base packages requried...
-logSysInfo <- function(logFilePath = "assets-RunAll/Log/sessionInfo.csv") {
+logSysInfo <- function(logFilePath = "assets-RunAll/Log/sessionInfo.csv", UserMessage="") {
   sessionNames <- c("platform","running","R.version")
-  sessionInfoValues <- sessionInfo()[sessionNames]
+  sessionInfoValues <- suppressWarnings(sessionInfo())
+  projectName <-        if (exists("iniRunAll")) {
+          iniRunAll$Config$ProjectName
+  } else {
+          "Project Not Specified"
+  }
   sessionInfoValues <- matrix(
     c(
+        projectName,
       sessionInfoValues$R.version$version.string,
       sessionInfoValues$platform,
       sessionInfoValues$running,
-      Sys.time()
-    ),ncol=4
+      Sys.time(),
+        paste(UserMessage,sep = "; ")
+    ),ncol=6
   )
-  colnames(sessionInfoValues) <- c(sessionNames,"TimeStamp")
+  colnames(sessionInfoValues) <- c("project",sessionNames,"TimeStamp","UserMessage")
   if (file.exists(logFilePath)) {
     write.table(
       sessionInfoValues,
@@ -19,7 +26,7 @@ logSysInfo <- function(logFilePath = "assets-RunAll/Log/sessionInfo.csv") {
       row.names = FALSE,
       col.names = FALSE,
       sep = ","
-    )  
+    )
   } else {
     if (!dir.exists(dirname(logFilePath))) {
       # Build log file path
